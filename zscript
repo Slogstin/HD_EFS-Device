@@ -1,0 +1,85 @@
+version "4.14"
+
+class VirEFSDevice:HDWeapon{
+	override bool AddSpareWeapon(actor newowner){return AddSpareWeaponRegular(newowner);}
+	override hdweapon GetSpareWeapon(actor newowner,bool reverse,bool doselect){return GetSpareWeaponRegular(newowner,reverse,doselect);}
+	default{
+		+inventory.invbar
+		+hdweapon.fitsinbackpack
+		-nointeraction
+		weapon.selectionorder 1002;
+		weapon.slotnumber 9;
+		scale 0.2;
+		tag "E.F.S. Device";
+		hdweapon.refid HDLD_FINJCTR;
+		hdweapon.refid "EFS";
+		inventory.icon "NMONA0";
+		inventory.pickupmessage "Picked up an E.F.S. Device.";
+	}
+	override void initializewepstats(bool idfa){
+		patientname=Stringtable.Localize("$MEDIKIT_UNKNOWN");
+	}
+	override double weaponbulk(){
+		return 2;
+	}
+	string patientname;
+	
+	override string gethelptext(){
+		LocalizeHelp();
+		int usedon=weaponstatus[MEDS_USEDON];
+		return
+		LWPHELP_FIRE..StringTable.Localize("  Scan")
+		;
+	}
+	states{
+	select:
+		TNT1 A 10{
+			if(!DoHelpText()) return;
+			A_WeaponMessage(Stringtable.Localize("\cg+++ \cjE.F.S. Device \cg+++\c-\n\n\nPress Fire\nto scan yourself."),175);
+		}
+		goto super::select;
+	ready:
+		TNT1 A 1 A_WeaponReady();
+		goto readyend;
+	fire:
+	diagnose:
+		TNT1 A 0 A_WeaponMessage(Stringtable.Localize("\cdE.F.S Device engaged.\c-\n\n\ccScanning, please wait..."));
+		TNT1 AAAAAAAAAAAA 2{
+			A_StartSound("medikit/scan",CHAN_WEAPON,volume:0.5);
+			A_SetBlend("aa aa 88",0.04,1);
+		}
+		TNT1 A 0 A_ScanResults(self);
+		TNT1 A 0 A_Refire("nope");
+		goto readyend;
+
+	spawn:
+		NMON A -1;
+		wait;
+	}
+	action void A_ScanResults(actor scanactor){
+		A_StartSound("medikit/done",CHAN_WEAPON);
+		if(!scanactor){
+			A_WeaponMessage(Stringtable.Localize("\cdE.F.S Device engaged.\c-\n\n\ccScanning, please wait..."));
+			invoker.target=null;
+			invoker.weaponstatus[MEDS_ACCURACY]=0;
+			return;
+		}
+
+		string playerspecs="";
+		let slf=HDPlayerPawn(scanactor);
+		if(slf){
+			UaS_HungerTracker tracker = UaS_HungerTracker(scanactor.FindInventory("UaS_HungerTracker"));
+				if (tracker) {
+				int calories = tracker.energy;
+				int fluids = tracker.hydro;
+			playerspecs=
+			Stringtable.Localize("\n\ccEnergy: \ce")..string.format("%.0d", calories).." cal\c-"..
+			Stringtable.Localize("\n\ccHydro: \cv")..string.format("%.0d", fluids).." ml\c-";
+			}
+		}
+
+		A_WeaponMessage(Stringtable.Localize("Automatic Energy & Fluid Scan for \cd\n")..scanactor.gettag()..""..playerspecs,270);
+
+		A_Log(Stringtable.Localize("Automatic Energy & Fluid Scan for \cd\n")..scanactor.gettag()..playerspecs,true);
+	}
+}
